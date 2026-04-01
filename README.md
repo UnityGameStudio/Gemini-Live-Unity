@@ -2,9 +2,11 @@
 
 This is a repository that contains scripts from a Unity Project for integrating [Gemini-Live](https://ai.google.dev/gemini-api/docs/live-api/get-started-websocket) API with Unity through raw websockets. 
 
-For this specific example, the user can send messages to the Model, and will receive chuncks of audioBase64. The chuncks of audioBase64 are processed and transformed into audio files so the user can listen small audio files together. 
+For this specific example, the user can send text messages, audio, and videos to the Model. As response, Unity will receive chuncks of audioBase64. The chuncks of audioBase64 are processed and transformed into audio files so the user can listen small audio files together. 
 
 Here's a quick video that shows the Demo in Unity: [Watch the YouTube Demo - PENDING VIDEO](https://www.youtube.com/watch?v=Z6MFqIzOHK0).
+
+Note: If you are not listening any audio, check your Debug Console and look for audioBase64 responses from Gemini. Few times, Gemini replies with only text instead. Also, Gemini does not reply to the videos, you need to ask something related to the video through voice or through text. 
 
 # Setup
 
@@ -13,14 +15,14 @@ You will need to fetch your Google API key, which can be found in your Google AI
 
 ### Step 2: Add the scripts to your scene inside an empty object
 
-![](/Images/Gemini_Live_Image_1.png)
+![](/Images/Gemini_Live_Image_4.png)
 
 Attach the dependencies inside the variables, it should ended up like the picture. 
 
 ### Step 3: Add a simplified User Interface 
-The interface should include a Canvas, a Text, an Input Field, and a Button.
+The interface should include a Canvas, a Text, an Input Field, and a couple Buttons to try out the functionalities.
 
-![](/Images/Gemini_Live_Image_2.png)
+![](/Images/Gemini_Live_Image_5.png)
 
 # Important
 
@@ -35,5 +37,4 @@ Unlike a standard API call, which sends a request and waits for a complete respo
 
 # Future work
 
-This repository is starting with texts messages, but we want to include live voice recordings, and even live videos. Then, expect some changes in the code that might include the use of microphone, and the use of camera to send these files to Gemini Live. 
-
+This repository is a work-in-progress. Google is still experimenting with Gemini Live through raw websockets, therefore feel free to create an issue if certain parts of the code aren't working due to a Google update. It is not 100% sure that this solution will be kept "free" and available by Google. 
