@@ -444,11 +444,11 @@ private string ExtractValue(string json, string keyPrefix)
 
     return json.Substring(start, end - start);
 }
-    // private void HandleToolCall(string json)
-    // {
-    //     // Add your tool call logic here
-    //     // Use ExtractValue() to pull out specific fields as needed
-    // }
+    private void HandleToolCall(string json)
+    {
+        // Add your tool call logic here
+        // Use ExtractValue() to pull out specific fields as needed
+    }
 
 
 private Queue<AudioClip> _audioQueue = new Queue<AudioClip>();
