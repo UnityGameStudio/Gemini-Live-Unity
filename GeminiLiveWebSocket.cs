@@ -3,6 +3,7 @@ using System.Text;
 using UnityEngine;
 using NativeWebSocket;
 using System.Collections.Generic;
+using System.Collections;
 
 public class GeminiLiveWebSocket : MonoBehaviour
 {
@@ -19,10 +20,239 @@ public class GeminiLiveWebSocket : MonoBehaviour
     [Header("Audio")]
     [SerializeField] private AudioSource _audioSource;
 
+[Header("Video")]
+[SerializeField] private int _videoFrameRate = 1; // frames per second to send
+[SerializeField] private int _videoWidth = 640;
+[SerializeField] private int _videoHeight = 480;
 
-    // -------------------------------------------------------
-    // Lifecycle
-    // -------------------------------------------------------
+// Camera Variable
+private WebCamTexture _webcamTexture;
+private bool _isStreamingVideo = false;
+private float _videoFrameInterval => 1f / _videoFrameRate;
+private float _videoFrameTimer = 0f;
+
+// Screensharing Variable
+private bool _isCapturingScreen = false;
+private float _screenFrameTimer = 0f;
+[SerializeField] private float _screenFrameInterval = 1.0f; // Send 1 frame per second
+
+// Audio Recording Variables
+private float _audioFrameTimer = 0f;
+private float _audioFrameInterval = 0.1f; 
+
+// Mic Variables
+
+private string _micDevice;
+private AudioClip _micClip;
+private bool _isStreamingAudio = false;
+private int _lastSamplePos = 0;
+private const int SAMPLING_RATE = 16000; 
+
+public void StartVideoStream()
+{
+    if (_isStreamingVideo)
+    {
+        Debug.LogWarning("Video stream already running.");
+        return;
+    }
+
+    if (WebCamTexture.devices.Length == 0)
+    {
+        Debug.LogError("No camera devices found.");
+        return;
+    }
+
+    _webcamTexture = new WebCamTexture(
+        WebCamTexture.devices[0].name, 
+        _videoWidth, 
+        _videoHeight, 
+        _videoFrameRate
+    );
+
+    _webcamTexture.Play();
+    _isStreamingVideo = true;
+    _videoFrameTimer = 0f;
+
+    Debug.Log($"Video stream started: {WebCamTexture.devices[0].name}");
+}
+
+public void StopVideoStream()
+{
+    if (!_isStreamingVideo) return;
+
+    _isStreamingVideo = false;
+
+    if (_webcamTexture != null)
+    {
+        _webcamTexture.Stop();
+        _webcamTexture = null;
+    }
+
+    Debug.Log("Video stream stopped.");
+}
+
+
+public void StartAudioStreaming()
+{
+    if (_isStreamingAudio) return;
+
+    if (Microphone.devices.Length == 0)
+    {
+        Debug.LogError("No microphone found.");
+        return;
+    }
+
+    _micDevice = Microphone.devices[0];
+    // Create a 10-second looping clip
+    _micClip = Microphone.Start(_micDevice, true, 10, SAMPLING_RATE);
+    _isStreamingAudio = true;
+    _lastSamplePos = 0;
+
+    Debug.Log($"Audio streaming started: {_micDevice}");
+}
+
+public void StopAudioStreaming()
+{
+    if (!_isStreamingAudio) return;
+
+    Microphone.End(_micDevice);
+    _micClip = null;
+    _isStreamingAudio = false;
+    Debug.Log("Audio streaming stopped.");
+}
+
+private void CaptureAndSendAudio()
+{
+    if (!_isStreamingAudio || _websocket?.State != WebSocketState.Open) return;
+
+    int currentPos = Microphone.GetPosition(_micDevice);
+    if (currentPos == _lastSamplePos) return;
+
+    // Calculate how many samples were recorded since last time
+    int sampleCount = (currentPos > _lastSamplePos) 
+        ? currentPos - _lastSamplePos 
+        : (SAMPLING_RATE * 10) - _lastSamplePos + currentPos;
+
+    if (sampleCount <= 0) return;
+
+    float[] samples = new float[sampleCount];
+    _micClip.GetData(samples, _lastSamplePos);
+    _lastSamplePos = currentPos;
+
+    // Convert float samples (-1.0 to 1.0) to 16-bit PCM (short)
+    short[] pcmData = new short[samples.Length];
+    for (int i = 0; i < samples.Length; i++)
+    {
+        pcmData[i] = (short)(samples[i] * 32767f);
+    }
+
+    // Convert short[] to byte[]
+    byte[] byteData = new byte[pcmData.Length * 2];
+    Buffer.BlockCopy(pcmData, 0, byteData, 0, byteData.Length);
+
+    // Send to Gemini
+    string base64Audio = Convert.ToBase64String(byteData);
+    string json = "{"
+        + "\"realtimeInput\":{"
+            + "\"audio\":{"
+                + "\"data\":\"" + base64Audio + "\","
+                + "\"mimeType\":\"audio/pcm;rate=16000\""
+            + "}"
+        + "}"
+    + "}";
+
+    SendRaw(json);
+}
+
+
+private IEnumerator SendDesktopScreenFrame()
+{
+    if (_websocket?.State != WebSocketState.Open) yield break;
+    
+    // CRITICAL: Wait until the frame is completely rendered
+    yield return new WaitForEndOfFrame();
+    
+    int width = Screen.width;
+    int height = Screen.height;
+    
+    // Create a texture matching the screen size
+    Texture2D screenTexture = new Texture2D(width, height, TextureFormat.RGB24, false);
+    
+    // Now ReadPixels will work because we're inside the drawing frame
+    screenTexture.ReadPixels(new Rect(0, 0, width, height), 0, 0);
+    screenTexture.Apply();
+    
+    byte[] jpegBytes = screenTexture.EncodeToJPG(70); 
+
+    // 3. Clean up the texture memory immediately to prevent crashes
+    Destroy(screenTexture); 
+
+    // 4. Convert and Send
+    string base64Frame = Convert.ToBase64String(jpegBytes);
+
+    string json = "{"
+        + "\"realtimeInput\":{"
+            + "\"video\":{"
+                + "\"data\":\"" + base64Frame + "\","
+                + "\"mimeType\":\"image/jpeg\""
+            + "}"
+        + "}"
+    + "}";
+
+    SendRaw(json);
+}
+
+public void StartScreenCapture()
+{
+    if (_isCapturingScreen)
+    {
+        Debug.LogWarning("Screen capture already running.");
+        return;
+    }
+
+    _isCapturingScreen = true;
+    _screenFrameTimer = 0f;
+    Debug.Log("Desktop Screen capture started.");
+}
+
+public void StopScreenCapture()
+{
+    _isCapturingScreen = false;
+    Debug.Log("Desktop Screen capture stopped.");
+}
+
+
+private void SendVideoFrame()
+{
+    if (_websocket?.State != WebSocketState.Open)
+    {
+        Debug.LogWarning("WebSocket not open, skipping frame.");
+        return;
+    }
+
+    if (_webcamTexture == null || !_webcamTexture.isPlaying) return;
+
+    // Grab current frame and encode to JPEG
+    Texture2D snapshot = new Texture2D(_webcamTexture.width, _webcamTexture.height);
+    snapshot.SetPixels(_webcamTexture.GetPixels());
+    snapshot.Apply();
+
+    byte[] jpegBytes = snapshot.EncodeToJPG(75); // 75 = quality
+    Destroy(snapshot); // avoid memory leak
+
+    string base64Frame = Convert.ToBase64String(jpegBytes);
+
+    string json = "{"
+        + "\"realtimeInput\":{"
+            + "\"video\":{"
+                + "\"data\":\"" + base64Frame + "\","
+                + "\"mimeType\":\"image/jpeg\""
+            + "}"
+        + "}"
+    + "}";
+
+    SendRaw(json);
+}
 
     async void Start()
     {
@@ -41,11 +271,46 @@ public class GeminiLiveWebSocket : MonoBehaviour
         _audioSource.clip = _audioQueue.Dequeue();
         _audioSource.Play();
     }
+
+    // Video frame dispatch
+    if (_isStreamingVideo)
+    {
+        _videoFrameTimer += Time.deltaTime;
+        if (_videoFrameTimer >= _videoFrameInterval)
+        {
+            _videoFrameTimer = 0f;
+            SendVideoFrame();
+        }
+    }
+
+    if (_isCapturingScreen)
+    {
+        _screenFrameTimer += Time.deltaTime;
+        if (_screenFrameTimer >= _screenFrameInterval)
+        {
+            _screenFrameTimer = 0f;
+            // Coroutines must be started this way
+            StartCoroutine(SendDesktopScreenFrame());
+        }
+    }
+
+     if (_isStreamingAudio)
+    {
+        _audioFrameTimer += Time.deltaTime;
+        if (_audioFrameTimer >= _audioFrameInterval)
+        {
+            _audioFrameTimer = 0f;
+            CaptureAndSendAudio();
+        }
+    }
 }
 
 
     async void OnApplicationQuit()
     {
+        StopScreenCapture();
+        StopVideoStream(); 
+        StopAudioStreaming();
         if (_websocket != null)
             await _websocket.Close();
     }
@@ -66,9 +331,6 @@ public class GeminiLiveWebSocket : MonoBehaviour
         await _websocket.Connect();
     }
 
-    // -------------------------------------------------------
-    // Handlers
-    // -------------------------------------------------------
 
     private void OnOpen()
     {
@@ -93,9 +355,6 @@ public class GeminiLiveWebSocket : MonoBehaviour
         Debug.Log($"WebSocket Closed: {code}");
     }
 
-    // -------------------------------------------------------
-    // Send helpers
-    // -------------------------------------------------------
 
 private void SendConfig()
 {
@@ -136,9 +395,6 @@ private void SendConfig()
         await _websocket.SendText(json);
     }
 
-    // -------------------------------------------------------
-    // Response parsing (manual)
-    // -------------------------------------------------------
 
 private void HandleResponse(string json)
 {
@@ -188,11 +444,11 @@ private string ExtractValue(string json, string keyPrefix)
 
     return json.Substring(start, end - start);
 }
-    private void HandleToolCall(string json)
-    {
-        // Add your tool call logic here
-        // Use ExtractValue() to pull out specific fields as needed
-    }
+    // private void HandleToolCall(string json)
+    // {
+    //     // Add your tool call logic here
+    //     // Use ExtractValue() to pull out specific fields as needed
+    // }
 
 
 private Queue<AudioClip> _audioQueue = new Queue<AudioClip>();
@@ -213,11 +469,6 @@ private void ProcessAudioData(string base64Audio)
     clip.SetData(samples, 0);
     _audioQueue.Enqueue(clip);
 }
-
-
-    // -------------------------------------------------------
-    // Utility
-    // -------------------------------------------------------
 
     private string EscapeJson(string text)
     {
