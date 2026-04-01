@@ -12,15 +12,20 @@ public class GeminiChatUI : MonoBehaviour
     [SerializeField] private TMP_Text _responseText;
     [SerializeField] private TMP_InputField _inputField;
     [SerializeField] private Button _sendButton;
-    // [SerializeField] private ScrollRect _scrollRect;
+    [SerializeField] private Button _startRecordingButton;
+     [SerializeField] private Button _startAudioRecordingButton;
+    [SerializeField] private Button _startScreenRecordingButton;
 
-    // -------------------------------------------------------
-    // Lifecycle
-    // -------------------------------------------------------
 
     private void Start()
     {
         _sendButton.onClick.AddListener(OnSendClicked);
+
+        _startRecordingButton.onClick.AddListener(OnRecordClicked);
+        
+        _startAudioRecordingButton.onClick.AddListener(OnAudioRecordClicked);
+
+        _startScreenRecordingButton.onClick.AddListener(OnRecordScreenClicked);
 
         // Allow pressing Enter to send
         _inputField.onSubmit.AddListener(OnInputSubmit);
@@ -31,16 +36,33 @@ public class GeminiChatUI : MonoBehaviour
     private void OnDestroy()
     {
         _sendButton.onClick.RemoveListener(OnSendClicked);
+        _startRecordingButton.onClick.RemoveListener(OnRecordClicked);
+
+        _startAudioRecordingButton.onClick.RemoveListener(OnAudioRecordClicked);
+
+        _startScreenRecordingButton.onClick.RemoveListener(OnRecordScreenClicked);
+
         _inputField.onSubmit.RemoveListener(OnInputSubmit);
     }
-
-    // -------------------------------------------------------
-    // Input
-    // -------------------------------------------------------
 
     private void OnSendClicked()
     {
         TrySendMessage();
+    }
+
+    private void OnRecordClicked()
+    {
+        TryRecordVideo();
+    }
+
+    private void OnAudioRecordClicked()
+    {
+        TryRecordAudio();
+    }
+
+    private void OnRecordScreenClicked()
+    {
+        TryRecordScreen();
     }
 
     private void OnInputSubmit(string value)
@@ -62,9 +84,21 @@ public class GeminiChatUI : MonoBehaviour
         _inputField.ActivateInputField(); // keep focus
     }
 
-    // -------------------------------------------------------
-    // Output (called by GeminiLiveClient)
-    // -------------------------------------------------------
+    private void TryRecordVideo()
+    {
+        _geminiClient.StartVideoStream();
+    }
+
+    private void TryRecordScreen()
+    {
+        _geminiClient.StartScreenCapture();
+    }
+
+
+    private void TryRecordAudio()
+    {
+        _geminiClient.StartAudioStreaming();
+    }
 
     public void ShowUserTranscription(string text)
     {
@@ -81,10 +115,6 @@ public class GeminiChatUI : MonoBehaviour
         AppendToChat("Gemini", $"[Audio received — {base64Length} bytes]");
     }
 
-    // -------------------------------------------------------
-    // Helpers
-    // -------------------------------------------------------
-
     private void AppendToChat(string speaker, string message)
     {
         if (!string.IsNullOrEmpty(_responseText.text))
@@ -93,14 +123,5 @@ public class GeminiChatUI : MonoBehaviour
         // Bold speaker label + message
         _responseText.text += $"<b>{speaker}:</b> {message}";
 
-        // // Scroll to bottom after layout updates
-        // StartCoroutine(ScrollToBottom());
     }
-
-    // private IEnumerator ScrollToBottom()
-    // {
-    //     // Wait for layout to rebuild before scrolling
-    //     yield return new WaitForEndOfFrame();
-    //     _scrollRect.verticalNormalizedPosition = 0f;
-    // }
 }
