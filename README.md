@@ -10,10 +10,13 @@ Note: If you are not listening any audio, check your Debug Console and look for 
 
 # Setup
 
-### Step 1: Login to your Google account, copy your secret key and save it for the next stage
+### Step 1: Through the package manager, install the next dependency - endel/NativeWebSocket
+Follow the instruction on how to install the NativeWebSocket package [here](https://github.com/endel/NativeWebSocket). 
+
+### Step 2: Login to your Google account, copy your secret key and save it for the next stage
 You will need to fetch your Google API key, which can be found in your Google AI Studio account under `Get API Key` (or through [this direct link](https://aistudio.google.com/app/apikey)). 
 
-### Step 2: Add the scripts to your scene inside an empty object
+### Step 3: Add the scripts to your scene inside an empty object
 
 ![](/Images/Gemini_Live_Image_4.png)
 
