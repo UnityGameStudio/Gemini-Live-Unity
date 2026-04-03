@@ -4,7 +4,7 @@ This is a repository that contains scripts from a Unity Project for integrating 
 
 For this specific example, the user can send text messages, audio, and videos to the Model. As response, Unity will receive chuncks of audioBase64. The chuncks of audioBase64 are processed and transformed into audio files so the user can listen small audio files together. 
 
-Here's a quick video that shows the Demo in Unity: [Watch the YouTube Demo - PENDING VIDEO](https://www.youtube.com/watch?v=Z6MFqIzOHK0).
+Here's a quick video that shows the Demo in Unity: [Watch the YouTube Demo](https://www.youtube.com/watch?v=rjW3B_rpZ5c).
 
 Note: If you are not listening any audio, check your Debug Console and look for audioBase64 responses from Gemini. Few times, Gemini replies with only text instead. Also, Gemini does not reply to the videos, you need to ask something related to the video through voice or through text. 
 
